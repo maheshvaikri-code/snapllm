@@ -1008,6 +1008,7 @@ export default function Models() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [selectedModel, setSelectedModel] = useState<LoadedModel | null>(null);
   const [modelsFolder, setModelsFolder] = useState<string>(getDefaultModelsPath());
+  const [modelsFolderDirty, setModelsFolderDirty] = useState(false);
   const [folderModels, setFolderModels] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -1025,10 +1026,13 @@ export default function Models() {
   });
 
   useEffect(() => {
-    if (configResponse?.default_models_path) {
+    // Do not overwrite a path the user is currently editing with the
+    // five-second config poll. The previous behavior made Browse/type + Scan
+    // appear to do nothing because the stale server value won the next poll.
+    if (!modelsFolderDirty && configResponse?.default_models_path) {
       setModelsFolder(configResponse.default_models_path.replace(/\\/g, '/'));
     }
-  }, [configResponse?.default_models_path]);
+  }, [configResponse?.default_models_path, modelsFolderDirty]);
 
   // Scan the models folder for .gguf files
   const scanCurrentFolder = async () => {
@@ -1055,6 +1059,7 @@ export default function Models() {
   const handleBrowseFolder = async () => {
     const folder = await selectModelsFolder();
     if (folder) {
+      setModelsFolderDirty(true);
       setModelsFolder(folder);
       // Scan the new folder
       setIsScanning(true);
@@ -1704,7 +1709,10 @@ export default function Models() {
                 <input
                   type="text"
                   value={modelsFolder}
-                  onChange={(e) => setModelsFolder(e.target.value)}
+                  onChange={(e) => {
+                    setModelsFolderDirty(true);
+                    setModelsFolder(e.target.value);
+                  }}
                   placeholder="Models folder path"
                   className="flex-1 px-2 py-1 text-sm rounded border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900"
                 />

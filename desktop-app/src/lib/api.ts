@@ -877,6 +877,12 @@ export const scanFolder = async (folderPath: string): Promise<string[]> => {
     }
   } catch (error: any) {
     console.warn('[scanFolder] Backend scan failed:', handleApiError(error));
+    // In browser/Docker mode the daemon is the only filesystem authority.
+    // Returning [] here hid 400/404 path errors as “no models found” and made
+    // an invalid container path indistinguishable from an empty directory.
+    if (!isTauriAvailable()) {
+      throw error;
+    }
     console.warn('[scanFolder] Falling back to Tauri...');
   }
 

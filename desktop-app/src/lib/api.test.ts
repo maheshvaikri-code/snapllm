@@ -165,6 +165,16 @@ describe('desktop API contracts', () => {
     ]);
   });
 
+  it('surfaces daemon path errors instead of treating them as an empty folder', async () => {
+    const error = Object.assign(new Error('Path does not exist: /models'), {
+      isAxiosError: true,
+      response: { status: 404, data: { error: { message: 'Path does not exist: /models' } } },
+    });
+    api.defaults.adapter = async () => { throw error; };
+
+    await expect(scanFolder('/models')).rejects.toThrow('Path does not exist: /models');
+  });
+
   it('sends the runtime API key as a Bearer header without putting it in the URL', async () => {
     const getRequest = captureNextRequest();
     setRuntimeApiKey(validApiKey);

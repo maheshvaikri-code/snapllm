@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.17.42
+
+- Make workspace and models paths deployment-aware and deterministic, preserve
+  user-edited model paths during polling, and surface scan path failures.
+
 ## 1.17.41
 
 - Harden release automation by triggering only from immutable version tags,

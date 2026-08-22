@@ -453,13 +453,17 @@ int main(int argc, char** argv) {
     std::string config_path = get_default_config_path();
     std::string server_api_key;
     std::vector<std::string> allowed_origins;
+    std::string deployment_workspace_root;
+    std::string deployment_models_path;
     if (const char* env_workspace = std::getenv("SNAPLLM_WORKSPACE_ROOT");
         env_workspace && *env_workspace) {
-        workspace_root = env_workspace;
+        deployment_workspace_root = env_workspace;
+        workspace_root = deployment_workspace_root;
     }
     if (const char* env_models = std::getenv("SNAPLLM_MODELS_PATH");
         env_models && *env_models) {
-        default_models_path = env_models;
+        deployment_models_path = env_models;
+        default_models_path = deployment_models_path;
     }
     if (const char* env_api_key = std::getenv("SNAPLLM_API_KEY")) {
         server_api_key = env_api_key;
@@ -535,16 +539,33 @@ int main(int argc, char** argv) {
         std::cerr << "[Config] Warning: " << config_error << std::endl;
     }
 
-    // Deployment-provided model mounts are authoritative. This prevents a
-    // native Windows path persisted in the shared config volume from masking
-    // Docker's `/models` mount after a container restart.
-    if (const char* env_models = std::getenv("SNAPLLM_MODELS_PATH");
-        env_models && *env_models && !default_models_path.empty()) {
-        std::error_code path_error;
-        if (!std::filesystem::exists(default_models_path, path_error)) {
-            default_models_path = env_models;
-        }
+    // Deployment-provided mounts are authoritative. A shared Docker config
+    // volume may contain a native Windows path from an earlier run; applying
+    // that path would make the container scan the wrong filesystem. The
+    // deployment environment must win on every restart, not only when the
+    // stale path happens not to exist.
+    if (!deployment_workspace_root.empty()) {
+        workspace_root = deployment_workspace_root;
     }
+    if (!deployment_models_path.empty()) {
+        default_models_path = deployment_models_path;
+    }
+
+    // Resolve relative settings once at startup so the API, scanner, and
+    // model loader all see the same absolute, normalized path. This also
+    // makes a config written from a different working directory deterministic.
+    auto normalize_config_path = [](const std::string& value) {
+        if (value.empty()) return value;
+        std::error_code path_error;
+        const std::filesystem::path path(value);
+        const auto absolute = path.is_absolute()
+            ? path
+            : std::filesystem::absolute(path, path_error);
+        if (path_error) return path.lexically_normal().string();
+        return absolute.lexically_normal().string();
+    };
+    workspace_root = normalize_config_path(workspace_root);
+    default_models_path = normalize_config_path(default_models_path);
 
 #ifdef SNAPLLM_HAS_DIFFUSION
     // Diffusion model support
