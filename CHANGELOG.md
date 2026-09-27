@@ -1,6 +1,10 @@
 # Changelog
+## 1.17.46
 
-## 1.17.45
+- Restrict no-think sanitization to empty leading reasoning shells; preserve non-empty reasoning blocks for API consumers.
+
+
+## 1.17.46
 
 - Wire streaming generation controls through the UI, including sampling,
   stop sequences, and explicit no-think requests.
@@ -483,3 +487,5 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Made the real Chat inference journey mandatory in Windows CI with a
   revision-pinned, SHA-256-verified 1.2 MB model fixture.
 - Removed raw inference-context and tensor pointers from the public bridge API.
+
+

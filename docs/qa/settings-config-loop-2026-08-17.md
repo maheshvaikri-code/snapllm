@@ -1,4 +1,4 @@
-# Server Settings and model-path QA (v1.17.45)
+# Server Settings and model-path QA (v1.17.46)
 
 ## Scope
 
@@ -22,10 +22,11 @@ applied after reconnect, and reflected by the Models page.
 npm --prefix desktop-app run lint                 PASS
 npm --prefix desktop-app run test -- --run       3 files, 17 tests PASS
 npm --prefix desktop-app run build                PASS
-node scripts/check_versions.mjs                   version_consistency: 1.17.45
+node scripts/check_versions.mjs                   version_consistency: 1.17.46
 ```
 
 The test `settings persistence contract` asserts that a user-selected model
 path (`D:/Models`) is retained in the server update payload. Live Docker
 validation still requires a daemon API key when the container is bound to
 `0.0.0.0`; the UI must have that key applied before saving.
+

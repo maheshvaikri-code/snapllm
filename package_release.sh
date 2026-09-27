@@ -6,7 +6,7 @@
 # This script creates a distributable release package with all necessary files.
 #
 # Usage: ./package_release.sh [version] [cpu|gpu]
-# Example: ./package_release.sh 1.17.45 cpu
+# Example: ./package_release.sh 1.17.46 cpu
 # ============================================================================
 
 set -e
@@ -18,7 +18,7 @@ echo "========================================"
 echo ""
 
 # Get version from argument or use default
-VERSION="${1:-1.17.45}"
+VERSION="${1:-1.17.46}"
 MODE="${2:-cpu}"
 if [[ "${MODE}" == "cuda" ]]; then MODE="gpu"; fi
 if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -153,3 +153,4 @@ echo "  1. Extract: tar -xzf ${RELEASE_NAME}.tar.gz"
 echo "  2. Run: cd ${RELEASE_NAME} && ./run_server.sh"
 echo "  3. Open: http://localhost:6930"
 echo ""
+

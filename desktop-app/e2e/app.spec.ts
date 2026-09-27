@@ -31,7 +31,7 @@ test('all public UI routes render without runtime errors', async ({ page }) => {
   await page.route('**/health', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ status: 'ok', version: '1.17.45' }),
+    body: JSON.stringify({ status: 'ok', version: '1.17.46' }),
   }));
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -258,3 +258,4 @@ test('responsive: primary routes avoid horizontal document overflow', async ({ p
     expect(overflow, `${path} overflows horizontally`).toBeLessThanOrEqual(1);
   }
 });
+

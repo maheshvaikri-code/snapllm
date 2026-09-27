@@ -1,6 +1,6 @@
 [package]
 name = "snapllm-desktop"
-version = "1.17.45"
+version = "1.17.46"
 description = "SnapLLM Desktop - Multi-Model LLM Serving Platform"
 authors = ["SnapLLM Team"]
 license = "MIT"
@@ -23,3 +23,4 @@ serde_json = "1.0"
 # this feature is used for production builds with the bundled custom protocol
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+

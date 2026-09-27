@@ -3,7 +3,7 @@
 
 api.info
 name SnapLLM
-version 1.17.45
+version 1.17.46
 base_url http://localhost:6930
 description "Local multi-model LLM inference with resident model selection"
 
@@ -27,7 +27,7 @@ path method description
 
 endpoint.health.response
 status ok
-version "1.17.45"
+version "1.17.46"
 timestamp "2026-01-19T12:00:00Z"
 models_loaded 3
 current_model medicine
@@ -617,3 +617,4 @@ websocket.example_flow
 4 "Server sends stream_token for each token"
 5 "Server sends stream_end with final stats"
 6 "Connection remains open for more requests"
+

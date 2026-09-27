@@ -73,21 +73,36 @@ namespace fs = std::filesystem;
 #include <cstdio>
 #include <vector>
 #include <thread>
-#include <regex>
 
 using json = nlohmann::ordered_json;
 
 namespace snapllm {
 namespace {
 
-// Reasoning-capable models may still emit an empty or populated <think> block
-// when callers explicitly disable thinking. Keep the transport contract clean
-// in that mode without altering normal (thinking-enabled) responses.
-std::string strip_reasoning_blocks(std::string text) {
-    static const std::regex think_block(R"(<(?:think|thinking)>[\s\S]*?</(?:think|thinking)>)",
-                                        std::regex::icase);
-    text = std::regex_replace(text, think_block, "");
-    return text;
+// Qwen can emit an empty leading reasoning shell even when thinking is
+// disabled. Remove only that exact shell; never discard non-empty reasoning
+// here because doing so would hide model behavior from API consumers.
+std::string strip_empty_think_shell(std::string text) {
+    const auto first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        return text;
+    }
+    const bool is_think = text.compare(first, 6, "<think>") == 0;
+    const bool is_thinking = text.compare(first, 9, "<thinking>") == 0;
+    const std::size_t open_length = is_think ? 7 : (is_thinking ? 10 : 0);
+    if (open_length == 0) {
+        return text;
+    }
+    const std::string close_tag = is_think ? "</think>" : "</thinking>";
+    const auto close = text.find(close_tag, first + open_length);
+    if (close == std::string::npos) {
+        return text;
+    }
+    const auto inner = text.substr(first + open_length, close - (first + open_length));
+    if (inner.find_first_not_of(" \t\r\n") != std::string::npos) {
+        return text;
+    }
+    return text.substr(0, first) + text.substr(close + close_tag.size());
 }
 
 bool read_bounded_integer(
@@ -1853,7 +1868,7 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
 
                                 // Build chunk
                                 const std::string visible_token = enable_thinking
-                                    ? token : strip_reasoning_blocks(token);
+                                    ? token : strip_empty_think_shell(token);
                                 json chunk = {
                                     {"id", completion_id},
                                     {"object", "chat.completion.chunk"},
@@ -1927,7 +1942,7 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
                                 }
 
                                 const std::string visible_token = enable_thinking
-                                    ? token : strip_reasoning_blocks(token);
+                                    ? token : strip_empty_think_shell(token);
                                 json chunk = {
                                     {"id", completion_id},
                                     {"object", "chat.completion.chunk"},
@@ -2029,7 +2044,7 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
             }
 
             if (!enable_thinking) {
-                result = strip_reasoning_blocks(std::move(result));
+                result = strip_empty_think_shell(std::move(result));
             }
 
             auto end_time = std::chrono::high_resolution_clock::now();
