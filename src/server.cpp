@@ -73,11 +73,22 @@ namespace fs = std::filesystem;
 #include <cstdio>
 #include <vector>
 #include <thread>
+#include <regex>
 
 using json = nlohmann::ordered_json;
 
 namespace snapllm {
 namespace {
+
+// Reasoning-capable models may still emit an empty or populated <think> block
+// when callers explicitly disable thinking. Keep the transport contract clean
+// in that mode without altering normal (thinking-enabled) responses.
+std::string strip_reasoning_blocks(std::string text) {
+    static const std::regex think_block(R"(<(?:think|thinking)>[\s\S]*?</(?:think|thinking)>)",
+                                        std::regex::icase);
+    text = std::regex_replace(text, think_block, "");
+    return text;
+}
 
 bool read_bounded_integer(
     const json& object,
@@ -1691,6 +1702,26 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
         // Memory leak in KVCacheExtractor fixed - contexts now cached per model
         bool use_context_cache = body.value("use_context_cache", true);
 
+        // Qwen3 and other reasoning models honor this flag through their chat
+        // template. SnapLLM currently builds a portable prompt directly, so
+        // also add the model-recognized /no_think directive as a compatibility
+        // shim and strip any block that is nevertheless returned.
+        bool enable_thinking = true;
+        if (body.contains("chat_template_kwargs")) {
+            const auto& kwargs = body["chat_template_kwargs"];
+            if (!kwargs.is_object()) {
+                send_error(res, "'chat_template_kwargs' must be an object");
+                return;
+            }
+            if (kwargs.contains("enable_thinking")) {
+                if (!kwargs["enable_thinking"].is_boolean()) {
+                    send_error(res, "'chat_template_kwargs.enable_thinking' must be a boolean");
+                    return;
+                }
+                enable_thinking = kwargs["enable_thinking"].get<bool>();
+            }
+        }
+
         if (!body.contains("messages")) {
             send_error(res, "Missing 'messages' array in request body");
             return;
@@ -1740,6 +1771,9 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
             limits::find_last_role_index(role_views, "user");
         if (query_index) {
             query_text = messages[*query_index].value("content", "");
+        }
+        if (!enable_thinking) {
+            query_text += "\n/no_think";
         }
 
         // Build context from all messages except the last user message
@@ -1803,14 +1837,14 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
 
                 res.set_chunked_content_provider(
                     MIMETYPE_SSE,
-                    [this, context_handle, query_text, config,
+                    [this, context_handle, query_text, config, enable_thinking,
                      completion_id, created, current_model](size_t /*offset*/, httplib::DataSink& sink) {
 
                         auto stream_start = std::chrono::high_resolution_clock::now();
                         size_t streamed_tokens = context_manager_->query_streaming(
                             context_handle,
                             "User: " + query_text + "\n\nAssistant:",
-                            [&sink, &completion_id, &created, &current_model](
+                            [&sink, &completion_id, &created, &current_model, enable_thinking](
                                 const std::string& token, int /*token_id*/, bool is_done) {
 
                                 if (!sink.is_writable()) {
@@ -1818,6 +1852,8 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
                                 }
 
                                 // Build chunk
+                                const std::string visible_token = enable_thinking
+                                    ? token : strip_reasoning_blocks(token);
                                 json chunk = {
                                     {"id", completion_id},
                                     {"object", "chat.completion.chunk"},
@@ -1826,7 +1862,7 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
                                     {"choices", json::array({
                                         {
                                             {"index", 0},
-                                            {"delta", {{"content", token}}},
+                                            {"delta", {{"content", visible_token}}},
                                             {"finish_reason", nullptr}
                                         }
                                     })},
@@ -1878,18 +1914,20 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
 
                 res.set_chunked_content_provider(
                     MIMETYPE_SSE,
-                    [this, full_prompt, max_tokens, temperature, top_p, top_k, repeat_penalty,
+                    [this, full_prompt, max_tokens, temperature, top_p, top_k, repeat_penalty, enable_thinking,
                      completion_id, created, current_model](size_t /*offset*/, httplib::DataSink& sink) {
                         auto stream_start = std::chrono::high_resolution_clock::now();
                         size_t streamed_tokens = manager_->generate_streaming_for_model(
                             current_model, full_prompt,
-                            [&sink, &completion_id, &created, &current_model](
+                            [&sink, &completion_id, &created, &current_model, enable_thinking](
                                 const std::string& token, int /*token_id*/, bool is_eos) -> bool {
 
                                 if (!sink.is_writable()) {
                                     return false;
                                 }
 
+                                const std::string visible_token = enable_thinking
+                                    ? token : strip_reasoning_blocks(token);
                                 json chunk = {
                                     {"id", completion_id},
                                     {"object", "chat.completion.chunk"},
@@ -1898,7 +1936,7 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
                                     {"choices", json::array({
                                         {
                                             {"index", 0},
-                                            {"delta", {{"content", token}}},
+                                            {"delta", {{"content", visible_token}}},
                                             {"finish_reason", nullptr}
                                         }
                                     })}
@@ -1988,6 +2026,10 @@ void SnapLLMServer::handle_chat_completions(const httplib::Request& req, httplib
                 if (completion_tokens == 0) {
                     completion_tokens = estimate_tokens(result);
                 }
+            }
+
+            if (!enable_thinking) {
+                result = strip_reasoning_blocks(std::move(result));
             }
 
             auto end_time = std::chrono::high_resolution_clock::now();

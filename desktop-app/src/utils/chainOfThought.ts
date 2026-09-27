@@ -112,7 +112,11 @@ export function extractChainOfThought(text: string): ExtendedThinking {
  */
 export function filterChainOfThought(text: string): string {
   const { cleanResponse } = extractChainOfThought(text);
-  return cleanResponse;
+  // During SSE, a model can emit the opening tag before its closing tag. Do
+  // not flash an incomplete reasoning block into the chat transcript while it
+  // is still being generated; the raw stream remains available to the final
+  // extractor once the block closes.
+  return cleanResponse.replace(/^\s*<(?:think|thinking)>[\s\S]*$/i, '').trim();
 }
 
 /**

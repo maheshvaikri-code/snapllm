@@ -1,0 +1,10 @@
+services:
+  snapllm:
+    image: maheshvaikri/snapllm:cuda
+    build:
+      dockerfile: Dockerfile.cuda
+      args:
+        SNAPLLM_CUDA: "ON"
+    gpus: all
+    volumes:
+      - D:/Models:/models:ro

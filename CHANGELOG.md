@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.17.45
+
+- Wire streaming generation controls through the UI, including sampling,
+  stop sequences, and explicit no-think requests.
+- Add server-side `/no_think` compatibility and reasoning-block sanitization
+  when thinking is disabled.
+- Add regression coverage for streaming request payloads and partial
+  `<think>` filtering.
+
+- Automatically load the existing local runtime API key into Settings and
+  clarify that viewing, copying, or applying it does not require a restart.
+
+## 1.17.43
+
+- Show the generated runtime API key in Settings with explicit Show, Copy,
+  and Apply controls while keeping it memory-only in the UI.
+
 ## 1.17.42
 
 - Make workspace and models paths deployment-aware and deterministic, preserve

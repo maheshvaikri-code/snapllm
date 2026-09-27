@@ -210,6 +210,46 @@ describe('desktop API contracts', () => {
     });
   });
 
+  it('wires streaming generation controls and disables reasoning at the source', async () => {
+    let requestInit: RequestInit | undefined;
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestInit = init;
+      return new Response('data: [DONE]\n\n', {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      new StreamingClient().connect(
+        {
+          model: 'qwen3-test',
+          messages: [{ role: 'user', content: 'hello' }],
+          max_tokens: 128,
+          temperature: 0.2,
+          top_p: 0.8,
+          top_k: 20,
+          repeat_penalty: 1.05,
+          presence_penalty: 0.1,
+          frequency_penalty: 0.2,
+          seed: 7,
+          stop: ['</think>'],
+          enable_thinking: false,
+          thinking_budget_tokens: 512,
+        },
+        () => undefined,
+        reject,
+        resolve,
+      );
+    });
+
+    const body = JSON.parse(String(requestInit?.body));
+    expect(body.temperature).toBe(0.2);
+    expect(body.stop).toEqual(['</think>']);
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(body.thinking).toEqual({ type: 'disabled', budget_tokens: 512 });
+  });
+
   it('sends explicit JSON tier bodies for context promotion and demotion', async () => {
     const requests: AxiosRequestConfig[] = [];
     api.defaults.adapter = async (config) => {

@@ -689,6 +689,16 @@ export default function Chat() {
           messages: streamMessages,  // Send full history for vPID L2 context caching
           max_tokens: settings.max_tokens,
           model: requestModelId,
+          temperature: settings.temperature,
+          top_p: settings.top_p,
+          top_k: settings.top_k,
+          repeat_penalty: settings.repeat_penalty,
+          presence_penalty: settings.presence_penalty,
+          frequency_penalty: settings.frequency_penalty,
+          seed: settings.seed === -1 ? undefined : settings.seed,
+          stop: settings.stop_sequences.length > 0 ? settings.stop_sequences : undefined,
+          enable_thinking: settings.enable_extended_thinking,
+          thinking_budget_tokens: settings.thinking_budget_tokens,
           use_context_cache: settings.use_context_cache,
         },
         (token: StreamToken) => {
@@ -696,7 +706,10 @@ export default function Chat() {
           setStreamingText(prev => {
             const newText = prev + token.token;
             streamingTextRef.current = newText;  // Keep ref in sync
-            return newText;
+            // Keep reasoning out of the live transcript when filtering is enabled.
+            // The raw buffer remains intact so the final response can still retain
+            // reasoning metadata when the user explicitly enables it.
+            return filterCoT ? filterChainOfThought(newText) : newText;
           });
 
           // Update metrics (both state and ref)
@@ -816,6 +829,7 @@ export default function Chat() {
         frequency_penalty: settings.frequency_penalty,
         seed: settings.seed === -1 ? undefined : settings.seed,
         stop: settings.stop_sequences.length > 0 ? settings.stop_sequences : undefined,
+        chat_template_kwargs: { enable_thinking: settings.enable_extended_thinking },
         // Extended thinking configuration (Anthropic-style)
         ...(settings.enable_extended_thinking && {
           thinking: {

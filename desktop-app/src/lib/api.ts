@@ -72,6 +72,9 @@ export const setRuntimeApiKey = (apiKey: string): void => {
   runtimeApiKey = apiKey;
 };
 
+/** Return the in-memory key for the local Settings UI only. */
+export const getRuntimeApiKey = (): string => runtimeApiKey;
+
 export const getRuntimeApiKeyValidationError = (apiKey: string): string | null => {
   if (apiKey.length === 0) {
     return null;
@@ -353,6 +356,16 @@ export interface StreamRequest {
   max_tokens?: number;
   model?: string;
   use_context_cache?: boolean; // vPID L2
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  repeat_penalty?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  seed?: number;
+  stop?: string[];
+  enable_thinking?: boolean;
+  thinking_budget_tokens?: number;
 }
 
 export interface StreamToken {
@@ -633,6 +646,20 @@ export class StreamingClient {
         ...(request.model ? { model: request.model } : {}),
         messages,
         max_tokens: request.max_tokens || 512,
+        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+        ...(request.top_p !== undefined ? { top_p: request.top_p } : {}),
+        ...(request.top_k !== undefined ? { top_k: request.top_k } : {}),
+        ...(request.repeat_penalty !== undefined ? { repeat_penalty: request.repeat_penalty } : {}),
+        ...(request.presence_penalty !== undefined ? { presence_penalty: request.presence_penalty } : {}),
+        ...(request.frequency_penalty !== undefined ? { frequency_penalty: request.frequency_penalty } : {}),
+        ...(request.seed !== undefined ? { seed: request.seed } : {}),
+        ...(request.stop && request.stop.length > 0 ? { stop: request.stop } : {}),
+        ...(request.enable_thinking !== undefined
+          ? { chat_template_kwargs: { enable_thinking: request.enable_thinking } }
+          : {}),
+        ...(request.thinking_budget_tokens !== undefined
+          ? { thinking: { type: request.enable_thinking ? 'enabled' : 'disabled', budget_tokens: request.thinking_budget_tokens } }
+          : {}),
         stream: true,
         use_context_cache: request.use_context_cache ?? true,  // Enable by default
       }),
@@ -941,6 +968,7 @@ export const sendChatMessage = async (params: {
   stop?: string[];
   stream?: boolean;
   use_context_cache?: boolean; // vPID L2: Enable context KV cache
+  chat_template_kwargs?: { enable_thinking?: boolean };
 }): Promise<any> => {
   const { data } = await api.post(
     '/v1/chat/completions',

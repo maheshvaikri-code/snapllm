@@ -24,10 +24,10 @@ manual-input checkout and cache trust boundary.
 ## Local validation
 
 ```text
-version_consistency: 1.17.42
+version_consistency: 1.17.45
 git diff --check: passed (line-ending warnings only)
 ```
 
-The GitHub alert list cannot reflect this fix until commit `v1.17.42` is
+The GitHub alert list cannot reflect this fix until commit `v1.17.45` is
 pushed and the workflow/CodeQL scan runs on the new repository. No alert was
 dismissed as part of this remediation.
